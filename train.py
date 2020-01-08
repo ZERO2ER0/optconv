@@ -4,23 +4,27 @@ import torch.nn as nn
 import torch.nn.functional as F 
 import torch.optim as optim
 import torchvision as tv
-import torchvision.transforms as transforms
+from torchvision import datasets, models, transforms
 import numpy as np
 from PIL import Image
 import model
+import pdb
 
 # 超参数设置
 EPOCH = 10   #遍历数据集次数
 BATCH_SIZE = 64      #批处理尺寸(batch_size)
 LR = 0.001        #学习率
  
-# 定义数据预处理方式
-transform = transforms.ToTensor()
+
 
 DATASET = 'mnist'
-
+# pdb.set_trace()
 if DATASET == 'mnist':
-        # 定义训练数据集
+    # pdb.set_trace()
+    # 定义数据预处理方式
+    transform = transforms.ToTensor()
+
+    # 定义训练数据集
     trainset = tv.datasets.MNIST(root='/Users/lichen/Downloads/DataSets/',
                                 train=True,
                                 download= False,
@@ -43,18 +47,31 @@ if DATASET == 'mnist':
                                             batch_size=BATCH_SIZE,
                                             shuffle=False,
                                             )
+    pdb.set_trace()
 elif DATASET == 'ucm':
+    data_transforms = {
+        'train': transforms.Compose([
+            transforms.Scale(256),
+		    transforms.RandomSizedCrop(224),
+		    transforms.RandomHorizontalFlip(),
+		    transforms.ToTensor(),
+		    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+		]),
+        'val': transforms.Compose([
+		    transforms.Scale(256),
+		    transforms.CenterCrop(224),
+		    transforms.ToTensor(),
+		    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+	    ]),
+	}
     data_dir = '/Users/lichen/Downloads/DataSets/UCM/'
-    image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x),
-											data_transforms[x])
-				  for x in ['train', 'val']}
-	dataloders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=batch_size, shuffle=True, num_workers=0, drop_last=False) 
-                for x in ['train', 'val']}
+    image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x), data_transforms[x]) for x in ['train', 'val']}
+    dataloders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=BATCH_SIZE, shuffle=True)for x in ['train', 'val']}
+
     dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val']}
-	class_names = image_datasets['train'].classes
+    class_names = image_datasets['train'].classes
 
- 
-
+# pdb.set_trace()
 
 # 定义损失函数loss function 和优化方式（采用SGD）
 # 定义是否使用GPU
@@ -64,38 +81,39 @@ criterion = nn.CrossEntropyLoss()  # 交叉熵损失函数，通常用于多分�
 optimizer = optim.SGD(net.parameters(), lr=LR, momentum=0.9)
 
 for epoch in range(EPOCH):
-        sum_loss = 0.0
-        # 数据读取
-        for i, data in enumerate(trainloader):
-            inputs, labels = data
-            inputs, labels = inputs.to(device), labels.to(device)
-            
-            # 梯度清零
-            optimizer.zero_grad()
- 
-            # forward + backward
-            outputs = net(inputs)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
- 
-            # 每训练100个batch打印一次平均loss
-            sum_loss += loss.item()
-            if i % 100 == 99:
-                print('[%d, %d] loss: %.03f'
-                      % (epoch + 1, i + 1, sum_loss / 100))
-                sum_loss = 0.0
-        # 每跑完一次epoch测试一下准确率
-        with torch.no_grad():
-            correct = 0
-            total = 0
-            for data in testloader:
-                images, labels = data
-                images, labels = images.to(device), labels.to(device)
-                outputs = net(images)
-                # 取得分最高的那个类
-                _, predicted = torch.max(outputs.data, 1)
-                total += labels.size(0)
-                correct += (predicted == labels).sum()
-            print('第%d个epoch的识别准确率为：%d%%' % (epoch + 1, (100 * correct / total)))
+    # pdb.set_trace()
+    sum_loss = 0.0
+    # 数据读取
+    for i, data in enumerate(trainloader):
+        inputs, labels = data
+        inputs, labels = inputs.to(device), labels.to(device)
+        
+        # 梯度清零
+        optimizer.zero_grad()
+
+        # forward + backward
+        outputs = net(inputs)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+
+        # 每训练100个batch打印一次平均loss
+        sum_loss += loss.item()
+        if i % 100 == 99:
+            print('[%d, %d] loss: %.03f'
+                    % (epoch + 1, i + 1, sum_loss / 100))
+            sum_loss = 0.0
+    # 每跑完一次epoch测试一下准确率
+    with torch.no_grad():
+        correct = 0
+        total = 0
+        for data in testloader:
+            images, labels = data
+            images, labels = images.to(device), labels.to(device)
+            outputs = net(images)
+            # 取得分最高的那个类
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum()
+        print('第%d个epoch的识别准确率为：%d%%' % (epoch + 1, (100 * correct / total)))
 
