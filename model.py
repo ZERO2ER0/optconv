@@ -3,6 +3,36 @@ import torch.nn as nn
 import torch.nn.functional as F 
 import numpy as np
 from PIL import Image
+import pdb
+
+
+
+class Multi_fft_conv2d(nn.Module):
+    def  __init__(self):
+        nn.Module.__init__(self)
+        self.layer1 = fft_conv2d()
+        self.pool1 = MaxPool2d_complex(40)
+        self.fc1 = nn.Linear(32, 16)
+        self.fc2 = nn.Linear(20, 10)
+    def forward(self, x):
+        x = self.layer1(x)
+        x = self.pool1(x)
+        x = x.view((-1, 4 * 4 * 2))
+        x = self.fc1(x)
+        return x
+        
+
+class MaxPool2d_complex(nn.Module):
+    def  __init__(self, pool_size = 40):
+        nn.Module.__init__(self)
+        self.pool_size = pool_size
+    def forward(self, com_tensor):
+        tensor_r, tensor_j = com_tensor.split(1, -1)
+        tensor_r = tensor_r.squeeze(-1)
+        tensor_j = tensor_j.squeeze(-1)
+        pool = nn.MaxPool2d(self.pool_size)
+        tensor_pool = torch.stack([pool(tensor_r), pool(tensor_j)], dim=-1)
+        return tensor_pool
 
 
 class fft_conv2d(nn.Module):
@@ -28,30 +58,28 @@ class fft_conv2d(nn.Module):
         self.kernels_lists = kernels_lists
         kernels_pad =[[F.pad(kernel, (0,0,pad_one,pad_two, pad_one,pad_two), 'constant', 0) for kernel in kernels]for kernels in                                    self.kernels_lists]
         self.psf_pad = torch.cat([torch.cat(kernel_list, dim=0) for kernel_list in kernels_pad], dim=1)
-        self.fc1 = nn.Linear(32, 10)
+
+        # self.fc1 = nn.Sequential(
+        #     nn.Linear(32, 16),
+        #     # nn.ReLU()
+        # )
+        # self.fc2 = nn.Sequential(
+        #     nn.Linear(16, 10),
+        #     #nn.ReLU()
+        # )
 
         
 
     def forward(self, x):
         x = self.fftconv2d(x, self.psf_pad, otf=None, adjoint=False, phase=True)
-        x = self.MaxPool2d_complex(x)
-        x = x.view(-1, 4 * 8)
-        x = self.fc1(x)
+        # x = self.MaxPool2d_complex(x)
+        # x = x.view(-1, 4 * 8)
+        # x = self.fc1(x)
+        # x = self.fc2(x)
         # nn.MaxPool2d(40, 40)
         # x = x.view(x.size(0), 256 * 6 * 6)
         # x = self.classifier(x)
         return x
-    def MaxPool2d_complex(self, a_tensor):
-        # shape = (1,1,160,160,2)
-        a_r, a_j = a_tensor.split(1,-1)
-        a_r = a_r.squeeze(-1)
-        a_j = a_j.squeeze(-1)
-        pool = nn.MaxPool2d(40)
-        a_r_p = pool(a_r)
-        a_j_p= pool(a_j)
-        a_p = torch.stack([a_r_p, a_j_p], dim = -1)
-        
-        return a_p
         
     def torch_conj(self, a_tensor):
 
@@ -104,5 +132,7 @@ class fft_conv2d(nn.Module):
             result = result
         else:
             result = index_select(-1, torch.tensor([0]))
+        
+
         return result
 
